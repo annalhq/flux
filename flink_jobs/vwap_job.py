@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 from pyflink.common.typeinfo import Types
-from pyflink.datastream import StreamExecutionEnvironment, MapFunction
+from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.table import StreamTableEnvironment
 
 from sinks.clickhouse_sink import (
