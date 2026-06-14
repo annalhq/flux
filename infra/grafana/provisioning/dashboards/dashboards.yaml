@@ -1,0 +1,9 @@
+apiVersion: 1
+providers:
+  - name: flux
+    folder: Flux
+    type: file
+    disableDeletion: true
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
