@@ -300,7 +300,7 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
-      GF_INSTALL_PLUGINS: grafana-clickhouse-datasource 4.14.1
+      GF_INSTALL_PLUGINS: grafana-clickhouse-datasource 4.14.0
       CLICKHOUSE_USER: ${CLICKHOUSE_USER}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
     volumes:
