@@ -107,6 +107,15 @@ wheels = [
 ]
 
 [[package]]
+name = "avro"
+version = "1.12.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/5f/68/973b9c682aa2c3cf2b05fc4c961af11b9be1d9b46604f65aed23cd4fd1e6/avro-1.12.2.tar.gz", hash = "sha256:e900e7b59a4781f63d9e935e88f6ec50c4d60be3f4adf9c63b51ed39d578fe08", size = 105500, upload-time = "2026-08-17T17:58:19.935Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/51/10/48f47d5da1fda33e2951019d38449e201efd9042117ad660aa4dcbf9268b/avro-1.12.2-py3-none-any.whl", hash = "sha256:bcbed5da65d298cb4ceb1e61f1a61b5b9fb180049c904f4045022338a95bf686", size = 134848, upload-time = "2026-08-17T17:58:18.369Z" },
+]
+
+[[package]]
 name = "botocore"
 version = "1.43.117"
 source = { registry = "https://pypi.org/simple" }
@@ -235,6 +244,13 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/fc/6c/f064ee299604127ca83fdb31bd31c8864ea420fca012405837500f6d4420/confluent_kafka-2.3.0-cp311-cp311-win_amd64.whl", hash = "sha256:1c6b29d57df99dabd45e67fd0aa46f17f195b057734ad84cf9cfdc2542855c10", size = 3444634, upload-time = "2023-10-25T18:37:46.672Z" },
 ]
 
+[package.optional-dependencies]
+avro = [
+    { name = "avro" },
+    { name = "fastavro" },
+    { name = "requests" },
+]
+
 [[package]]
 name = "duckdb"
 version = "1.1.3"
@@ -274,11 +290,12 @@ source = { virtual = "." }
 dev = [
     { name = "fastavro" },
     { name = "pytest" },
+    { name = "python-dotenv" },
     { name = "pyyaml" },
     { name = "ruff" },
 ]
 producers = [
-    { name = "confluent-kafka" },
+    { name = "confluent-kafka", extra = ["avro"] },
     { name = "fastavro" },
     { name = "prometheus-client" },
     { name = "websockets" },
@@ -295,11 +312,12 @@ recon = [
 dev = [
     { name = "fastavro", specifier = "==1.9.7" },
     { name = "pytest", specifier = "==8.3.4" },
+    { name = "python-dotenv", specifier = "==1.0.1" },
     { name = "pyyaml", specifier = "==6.0.2" },
     { name = "ruff", specifier = "==0.8.6" },
 ]
 producers = [
-    { name = "confluent-kafka", specifier = "==2.3.0" },
+    { name = "confluent-kafka", extras = ["avro"], specifier = "==2.3.0" },
     { name = "fastavro", specifier = "==1.9.7" },
     { name = "prometheus-client", specifier = "==0.21.1" },
     { name = "websockets", specifier = "==12.0" },
@@ -661,6 +679,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/66/c0/0c8b6ad9f17a802ee498c46e004a0eb49bc148f2fd230864601a86dcf6db/python-dateutil-2.9.0.post0.tar.gz", hash = "sha256:37dd54208da7e1cd875388217d5e00ebd4179249f90fb72437e91a35459a0ad3", size = 342432, upload-time = "2024-03-01T18:36:20.211Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ec/57/56b9bcc3c9c6a792fcbaf139543cee77261f3651ca9da0c93f5c1221264b/python_dateutil-2.9.0.post0-py2.py3-none-any.whl", hash = "sha256:a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427", size = 229892, upload-time = "2024-03-01T18:36:18.57Z" },
+]
+
+[[package]]
+name = "python-dotenv"
+version = "1.0.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/bc/57/e84d88dfe0aec03b7a2d4327012c1627ab5f03652216c63d49846d7a6c58/python-dotenv-1.0.1.tar.gz", hash = "sha256:e324ee90a023d808f1959c46bcbc04446a10ced277783dc6ee09987c37ec10ca", size = 39115, upload-time = "2024-01-23T06:33:00.505Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6a/3e/b68c118422ec867fa7ab88444e1274aa40681c606d59ac27de5a5588f082/python_dotenv-1.0.1-py3-none-any.whl", hash = "sha256:f7b63ef50f1b690dddf550d03497b66d609393b40b564ed0d674909a68ebf16a", size = 19863, upload-time = "2024-01-23T06:32:58.246Z" },
 ]
 
 [[package]]

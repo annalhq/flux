@@ -352,6 +352,26 @@ services:
       start_period: 60s
     deploy: { resources: { limits: { memory: 2g } } }
 
+  # ---------------------------------------------------------------- Ingestion
+  producers:
+    <<: *service
+    profiles: ["producers"]
+    build: { context: ., dockerfile: producers/Dockerfile }
+    image: flux/producers:0.1.0
+    ports: ["8000:8000"]
+    env_file: [{ path: .env, required: false }]
+    environment:
+      PRODUCER_MODE: ${PRODUCER_MODE:-synthetic}
+    depends_on:
+      schema-registry: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/metrics', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    deploy: { resources: { limits: { memory: 256m } } }
+
 volumes:
   kafka-1-data:
   kafka-2-data:

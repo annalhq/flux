@@ -1,0 +1,15 @@
+{
+  "type": "record",
+  "name": "CoinbaseTrade",
+  "namespace": "io.flux.raw.coinbase",
+  "doc": "Raw trade from the Coinbase Advanced Trade 'market_trades' channel (update events only).",
+  "fields": [
+    {"name": "trade_id",       "type": "string"},
+    {"name": "product_id",     "type": "string", "doc": "e.g. BTC-USD"},
+    {"name": "price",          "type": {"type": "bytes", "logicalType": "decimal", "precision": 18, "scale": 8}},
+    {"name": "size",           "type": {"type": "bytes", "logicalType": "decimal", "precision": 18, "scale": 8}},
+    {"name": "side",           "type": "string", "doc": "As sent by Coinbase: BUY or SELL, the side of the resting (maker) order; the taker side is the opposite"},
+    {"name": "event_time",     "type": {"type": "long", "logicalType": "timestamp-millis"}, "doc": "Parsed from ISO-8601 'time'"},
+    {"name": "ingestion_time", "type": {"type": "long", "logicalType": "timestamp-millis"}}
+  ]
+}

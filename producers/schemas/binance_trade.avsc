@@ -1,0 +1,17 @@
+{
+  "type": "record",
+  "name": "BinanceTrade",
+  "namespace": "io.flux.raw.binance",
+  "doc": "Raw trade from the Binance combined trade stream. Field names are expanded from Binance's one-letter keys.",
+  "fields": [
+    {"name": "event_type",     "type": "string", "doc": "Binance 'e', always 'trade'"},
+    {"name": "event_time",     "type": {"type": "long", "logicalType": "timestamp-millis"}, "doc": "Binance 'E'"},
+    {"name": "symbol",         "type": "string", "doc": "Binance 's', e.g. BTCUSDT"},
+    {"name": "trade_id",       "type": "long",   "doc": "Binance 't'"},
+    {"name": "price",          "type": {"type": "bytes", "logicalType": "decimal", "precision": 18, "scale": 8}},
+    {"name": "quantity",       "type": {"type": "bytes", "logicalType": "decimal", "precision": 18, "scale": 8}},
+    {"name": "trade_time",     "type": {"type": "long", "logicalType": "timestamp-millis"}, "doc": "Binance 'T'; the event time"},
+    {"name": "is_buyer_maker", "type": "boolean", "doc": "Binance 'm'; true means the taker sold"},
+    {"name": "ingestion_time", "type": {"type": "long", "logicalType": "timestamp-millis"}, "doc": "Producer wall clock"}
+  ]
+}

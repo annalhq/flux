@@ -6,9 +6,10 @@ with batch-vs-stream reconciliation in Airflow. The rebuild plan lives in `docs/
 ## Quickstart
 
 ```bash
-make env        # creates .env from .env.example
-make up         # all services, health-gated
-make test lint  # unit + contract tests, ruff
+make env                             # creates .env from .env.example
+make up                              # all services (health-gated), then topics, schemas, ClickHouse DDL
+PRODUCER_MODE=synthetic make producers   # seeded synthetic market: 2 h backfill, then real time
+make test lint                       # unit + contract tests, ruff
 ```
 
 | UI | URL |
@@ -20,3 +21,4 @@ make test lint  # unit + contract tests, ruff
 | Prometheus | http://localhost:9090 |
 | MinIO console | http://localhost:9001 |
 | Nessie | http://localhost:19120 |
+| Producer metrics | http://localhost:8000/metrics |

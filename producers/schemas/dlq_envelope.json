@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Producer DLQ envelope",
+  "type": "object",
+  "required": ["source", "stage", "target_topic", "key", "payload", "payload_encoding", "error", "failed_at_ms", "producer_version"],
+  "properties": {
+    "source":           {"enum": ["binance", "coinbase", "synthetic"]},
+    "stage":            {"enum": ["parse", "serialize", "deliver"]},
+    "target_topic":     {"type": "string"},
+    "key":              {"type": ["string", "null"]},
+    "payload":          {"type": "string"},
+    "payload_encoding": {"enum": ["text", "base64"]},
+    "error":            {"type": "string"},
+    "failed_at_ms":     {"type": "integer"},
+    "producer_version": {"type": "string"}
+  }
+}
