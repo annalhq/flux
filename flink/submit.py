@@ -39,7 +39,15 @@ class Job:
     checkpoint_var: str
 
 
-JOBS = {job.name: job for job in (Job("bars_1m", 2, "SIGNAL_CHECKPOINT_INTERVAL"),)}
+JOBS = {
+    job.name: job
+    for job in (
+        Job("bars_1m", 2, "SIGNAL_CHECKPOINT_INTERVAL"),
+        Job("whales", 1, "SIGNAL_CHECKPOINT_INTERVAL"),
+        Job("spreads", 2, "SIGNAL_CHECKPOINT_INTERVAL"),
+        Job("double_bottom", 1, "SIGNAL_CHECKPOINT_INTERVAL"),
+    )
+}
 
 
 class RenderError(ValueError):
