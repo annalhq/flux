@@ -4,7 +4,7 @@ SHELL := /bin/bash
 COMPOSE := docker compose
 UV      := uv run
 
-.PHONY: help env up down clean ps logs bootstrap jobs jobs-status producers producers-stop test lint fmt
+.PHONY: help env up down clean ps logs bootstrap jobs jobs-status jobs-down lake-stats producers producers-stop test lint fmt
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2}'
@@ -37,8 +37,14 @@ bootstrap: .env ## Create topics, register schemas, apply ClickHouse DDL (idempo
 jobs: .env ## Render and submit Flink SQL jobs; skips jobs already running
 	$(UV) python flink/submit.py up
 
+jobs-down: ## Stop Flink jobs with savepoints (restored by the next `make jobs`)
+	$(UV) python flink/submit.py down
+
 jobs-status: ## Flink job state and checkpoint health
 	$(UV) python flink/submit.py status
+
+lake-stats: ## Iceberg market.trades row, partition and snapshot counts
+	$(COMPOSE) exec airflow /opt/recon-venv/bin/python -m flux_recon.cli lake-stats
 
 producers: .env ## Build and start producers (PRODUCER_MODE=synthetic|live)
 	$(COMPOSE) --profile producers up -d --build --wait producers

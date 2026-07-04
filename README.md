@@ -9,6 +9,9 @@ with batch-vs-stream reconciliation in Airflow. The rebuild plan lives in `docs/
 make env                             # creates .env from .env.example
 make up                              # all services (health-gated), then topics, schemas, ClickHouse DDL
 PRODUCER_MODE=synthetic make producers   # seeded synthetic market: 2 h backfill, then real time
+make jobs-status                     # Flink jobs and checkpoint health
+make lake-stats                      # Iceberg market.trades rows, partitions, commits
+make jobs-down && make jobs          # stop with savepoints, then restore
 make test lint                       # unit + contract tests, ruff
 ```
 

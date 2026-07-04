@@ -22,7 +22,7 @@ x-kafka-env: &kafka-env
   KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
   KAFKA_TRANSACTION_MAX_TIMEOUT_MS: 900000
   KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-  KAFKA_HEAP_OPTS: "-Xmx512m -Xms512m"
+  KAFKA_HEAP_OPTS: "-Xmx384m -Xms384m"
 
 x-kafka: &kafka
   <<: *service
@@ -33,7 +33,7 @@ x-kafka: &kafka
     timeout: 10s
     retries: 10
     start_period: 30s
-  deploy: { resources: { limits: { memory: 1g } } }
+  deploy: { resources: { limits: { memory: 768m } } }
 
 x-flink: &flink
   <<: *service
@@ -44,9 +44,11 @@ x-flink: &flink
 
 x-flink-properties: &flink-properties |
   jobmanager.rpc.address: flink-jobmanager
-  jobmanager.memory.process.size: 1400m
-  taskmanager.memory.process.size: 3200m
+  jobmanager.memory.process.size: 1024m
+  taskmanager.memory.process.size: 2048m
   taskmanager.numberOfTaskSlots: 8
+  taskmanager.memory.managed.fraction: 0.25
+  env.java.opts.client: -Xmx256m
   state.backend.type: rocksdb
   state.backend.incremental: true
   state.checkpoints.dir: s3://flink-checkpoints/checkpoints
@@ -178,7 +180,7 @@ services:
       postgres: { condition: service_healthy }
       minio-init: { condition: service_completed_successfully }
     environment:
-      JAVA_OPTS_APPEND: "-Xmx384m"
+      JAVA_OPTS_APPEND: "-Xmx256m"
       nessie.version.store.type: JDBC2
       nessie.version.store.persist.jdbc.datasource: postgresql
       quarkus.datasource.postgresql.jdbc.url: jdbc:postgresql://postgres:5432/nessie
@@ -224,7 +226,7 @@ services:
       flink-jobmanager: { condition: service_healthy }
     environment:
       FLINK_PROPERTIES: *flink-properties
-    deploy: { resources: { limits: { memory: 3584m } } }
+    deploy: { resources: { limits: { memory: 2304m } } }
 
   # ---------------------------------------------------------------- Serving
   clickhouse:
@@ -328,7 +330,7 @@ services:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
-      AIRFLOW__WEBSERVER__WORKERS: 2
+      AIRFLOW__WEBSERVER__WORKERS: 1
       AIRFLOW_ADMIN_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD}
       PYTHONPATH: /opt/airflow
       ICEBERG_REST_URI: ${ICEBERG_REST_URI}
@@ -350,7 +352,7 @@ services:
       timeout: 10s
       retries: 20
       start_period: 60s
-    deploy: { resources: { limits: { memory: 2g } } }
+    deploy: { resources: { limits: { memory: 1536m } } }
 
   # ---------------------------------------------------------------- Ingestion
   producers:

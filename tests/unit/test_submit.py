@@ -1,6 +1,16 @@
 import pytest
 
-from flink.submit import JOBS, Job, RenderError, explain_script, job_variables, render, statements, substitute
+from flink.submit import (
+    JOBS,
+    Job,
+    RenderError,
+    explain_script,
+    job_variables,
+    latest_restore_point,
+    render,
+    statements,
+    substitute,
+)
 
 
 def test_substitute_resolves_nested_references():
@@ -45,3 +55,34 @@ def test_explain_requires_insert():
 
 def test_statements_ignore_comments():
     assert statements("-- c\nSELECT 1;\n-- only a comment;\n\nSELECT 2;") == ["SELECT 1", "SELECT 2"]
+
+
+def test_lake_job_includes_catalog_and_own_checkpoint_interval(env):
+    sql = render(JOBS["lake_sink"], {**env, "LAKE_CHECKPOINT_INTERVAL": "60 s"})
+    assert sql.index("CREATE CATALOG lake") < sql.index("INSERT INTO lake.market.trades")
+    assert "SET 'execution.checkpointing.interval' = '60 s';" in sql
+
+
+def test_restore_path_is_set_before_any_statement_runs(env):
+    sql = render(JOBS["bars_1m"], env, restore_from="s3://flink-checkpoints/checkpoints/bars_1m/abc/chk-7")
+    restore = sql.index(
+        "SET 'execution.savepoint.path' = 's3://flink-checkpoints/checkpoints/bars_1m/abc/chk-7';"
+    )
+    assert restore < sql.index("CREATE TEMPORARY TABLE")
+    assert "execution.savepoint.path" not in render(JOBS["bars_1m"], env)
+
+
+def test_checkpoints_are_grouped_by_job_name(env):
+    assert "SET 'state.checkpoints.dir' = 's3://flink-checkpoints/checkpoints/bars_1m';" in render(
+        JOBS["bars_1m"], env
+    )
+
+
+def test_latest_restore_point_picks_newest_of_checkpoints_and_savepoints():
+    points = [
+        ("2026-11-11T10:00:00Z", "s3://flink-checkpoints/checkpoints/bars_1m/j1/chk-9/_metadata"),
+        ("2026-11-11T12:00:00Z", "s3://flink-checkpoints/savepoints/bars_1m/savepoint-1a2b3c-d4e5/_metadata"),
+        ("2026-11-11T11:00:00Z", "s3://flink-checkpoints/checkpoints/bars_1m/j2/chk-3/_metadata"),
+    ]
+    assert latest_restore_point(points) == "s3://flink-checkpoints/savepoints/bars_1m/savepoint-1a2b3c-d4e5"
+    assert latest_restore_point([]) is None
