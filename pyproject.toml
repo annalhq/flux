@@ -32,7 +32,7 @@ default-groups = ["dev", "producers"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q --tb=short"
-pythonpath = ["producers", "."]
+pythonpath = ["producers", "airflow", "."]
 
 [tool.ruff]
 line-length = 110
@@ -41,3 +41,6 @@ extend-exclude = ["docs"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["flux_producers", "flux_recon", "flink"]

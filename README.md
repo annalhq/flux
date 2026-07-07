@@ -12,6 +12,7 @@ PRODUCER_MODE=synthetic make producers   # seeded synthetic market: 2 h backfill
 make jobs-status                     # Flink jobs and checkpoint health
 make lake-stats                      # Iceberg market.trades rows, partitions, commits
 make jobs-down && make jobs          # stop with savepoints, then restore
+make recon HOUR=2026-11-11T12        # reconcile one closed hour, lake vs stream
 make test lint                       # unit + contract tests, ruff
 ```
 
@@ -25,3 +26,5 @@ make test lint                       # unit + contract tests, ruff
 | MinIO console | http://localhost:9001 |
 | Nessie | http://localhost:19120 |
 | Producer metrics | http://localhost:8000/metrics |
+
+Reconciliation runs hourly in Airflow (`reconcile_hourly`); results are in `flux.recon_runs` and `flux.recon_windows`.

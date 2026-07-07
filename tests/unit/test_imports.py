@@ -1,8 +1,9 @@
 import importlib
 import pkgutil
 
-import flux_producers
 import pytest
+
+import flux_producers
 
 MODULES = [m.name for m in pkgutil.iter_modules(flux_producers.__path__, "flux_producers.")]
 

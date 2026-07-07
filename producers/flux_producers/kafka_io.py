@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from functools import partial
 
 from confluent_kafka import Consumer, KafkaError, Message, Producer, TopicPartition
-from confluent_kafka.schema_registry import SchemaRegistryClient
+from confluent_kafka.schema_registry import Schema, SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroSerializer
 from confluent_kafka.serialization import MessageField, SerializationContext
 
@@ -82,11 +82,15 @@ class TradeProducer:
             }
         )
         registry = SchemaRegistryClient({"url": settings.schema_registry_url})
+        self._registry = registry
+        self._schemas = {
+            name: (settings.schema_dir / s.schema_file).read_text() for name, s in STREAMS.items()
+        }
         # Schemas are registered by the bootstrap step; producers never evolve them implicitly.
         self._serializers = {
             name: AvroSerializer(
                 registry,
-                (settings.schema_dir / stream.schema_file).read_text(),
+                self._schemas[name],
                 conf={"auto.register.schemas": False},
             )
             for name, stream in STREAMS.items()
@@ -173,6 +177,27 @@ class TradeProducer:
             self._dlq.poll(0)
         except BufferError:
             log.error("DLQ queue full; dropped %s/%s message for %s", source, stage, topic)
+
+    def wait_until_ready(self, timeout: float = 300.0) -> None:
+        """Block until Kafka answers metadata requests and both value subjects resolve.
+
+        Serializing before Schema Registry is reachable would dead-letter every message, so a
+        dependency that is still starting is waited for rather than treated as a bad message.
+        """
+        deadline, delay = time.monotonic() + timeout, 1.0
+        while True:
+            try:
+                self._producer.list_topics(timeout=5)
+                for name, stream in STREAMS.items():
+                    self._registry.lookup_schema(f"{stream.topic}-value", Schema(self._schemas[name], "AVRO"))
+                log.info("kafka and schema registry ready")
+                return
+            except Exception as e:
+                if time.monotonic() + delay > deadline:
+                    raise RuntimeError(f"dependencies not ready after {timeout:.0f} s: {e}") from e
+                log.warning("waiting for dependencies: %s: %s", type(e).__name__, str(e)[:200])
+                time.sleep(delay)
+                delay = min(delay * 2, 15.0)
 
     def latest_event_ms(self, tail: int = 50, timeout: float = 10.0) -> int | None:
         """Newest message timestamp (event time) across the raw topics, or None if they are empty."""

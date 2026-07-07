@@ -3,8 +3,9 @@ SHELL := /bin/bash
 
 COMPOSE := docker compose
 UV      := uv run
+RECON_CLI := /opt/recon-venv/bin/python -m flux_recon.cli
 
-.PHONY: help env up down clean ps logs bootstrap jobs jobs-status jobs-down lake-stats producers producers-stop test lint fmt
+.PHONY: help env up down clean ps logs bootstrap jobs jobs-status jobs-down lake-stats recon producers producers-stop test lint fmt
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2}'
@@ -44,7 +45,14 @@ jobs-status: ## Flink job state and checkpoint health
 	$(UV) python flink/submit.py status
 
 lake-stats: ## Iceberg market.trades row, partition and snapshot counts
-	$(COMPOSE) exec airflow /opt/recon-venv/bin/python -m flux_recon.cli lake-stats
+	$(COMPOSE) exec airflow $(RECON_CLI) lake-stats
+
+recon: ## Reconcile one closed hour (HOUR=YYYY-MM-DDTHH, UTC); writes recon tables, not Airflow runs
+	@test -n "$(HOUR)" || { echo "usage: make recon HOUR=2026-11-11T13"; exit 2; }
+	$(COMPOSE) exec airflow sh -c 'set -e; \
+		start=$(HOUR):00:00+00:00; end=$$(date -u -d "$(HOUR):00:00Z + 1 hour" +%Y-%m-%dT%H:00:00+00:00); \
+		$(RECON_CLI) freshness $$start $$end; \
+		$(RECON_CLI) reconcile $$start $$end --run-id manual__$(HOUR)'
 
 producers: .env ## Build and start producers (PRODUCER_MODE=synthetic|live)
 	$(COMPOSE) --profile producers up -d --build --wait producers

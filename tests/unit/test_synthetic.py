@@ -2,6 +2,7 @@ from collections import defaultdict
 from decimal import Decimal
 
 import pytest
+
 from flux_producers.config import SynthSettings
 from flux_producers.parsing import parse_binance, parse_coinbase
 from flux_producers.synthetic import (

@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 import pytest
+
 from flux_producers.parsing import (
     ParseError,
     binance_asset,

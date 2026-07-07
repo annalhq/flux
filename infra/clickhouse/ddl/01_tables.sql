@@ -99,6 +99,7 @@ CREATE TABLE IF NOT EXISTS flux.recon_runs (
   windows_late       UInt32,
   windows_missing    UInt32,
   windows_exceed     UInt32,
+  windows_mismatch   UInt32,
   stream_events      UInt64,
   batch_events       UInt64,
   duplicate_events   UInt64,
@@ -108,3 +109,6 @@ CREATE TABLE IF NOT EXISTS flux.recon_runs (
   checked_at         DateTime64(3, 'UTC')
 ) ENGINE = ReplacingMergeTree(checked_at)
 ORDER BY interval_start;
+
+-- Brings databases created with an earlier recon_runs schema up to date; no-op otherwise.
+ALTER TABLE flux.recon_runs ADD COLUMN IF NOT EXISTS windows_mismatch UInt32 AFTER windows_exceed;

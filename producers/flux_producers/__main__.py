@@ -55,6 +55,7 @@ def main() -> int:
     log.info("starting: mode=%s assets=%s", settings.mode, ",".join(settings.assets))
     metrics.serve(settings.metrics_port)
     producer = TradeProducer(settings)
+    producer.wait_until_ready()
     try:
         asyncio.run(_run(settings, producer))
     finally:
