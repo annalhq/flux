@@ -1,1 +1,83 @@
-groups: []
+groups:
+  - name: kafka
+    rules:
+      - alert: KafkaConsumerLagHigh
+        expr: sum by (consumergroup) (kafka_consumergroup_lag) > 10000
+        for: 10m
+        labels: { severity: critical }
+        annotations:
+          summary: "Consumer group {{ $labels.consumergroup }} is {{ $value }} messages behind"
+      - alert: KafkaUnderReplicated
+        expr: sum(kafka_topic_partition_under_replicated_partition) > 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "{{ $value }} partitions are under-replicated"
+      - alert: KafkaBrokerMissing
+        expr: kafka_brokers < 3
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "Only {{ $value }} of 3 Kafka brokers are in the cluster"
+
+  - name: producers
+    rules:
+      - alert: ProducerSilent
+        # max_over_time keeps the last known value when the producer itself is down; the raw
+        # gauge goes stale then and the expression would return nothing.
+        expr: time() - max by (exchange) (max_over_time(flux_producer_last_event_timestamp_seconds[1h])) > 120
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "No {{ $labels.exchange }} trade acknowledged by Kafka for {{ $value | humanizeDuration }}"
+      - alert: ProducerTargetDown
+        expr: up{job="producers"} == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "Producer metrics endpoint is down"
+      - alert: ProducerDLQ
+        expr: sum by (exchange, stage) (increase(flux_producer_dlq_total[10m])) > 0
+        labels: { severity: warning }
+        annotations:
+          summary: "{{ $value }} {{ $labels.exchange }} messages dead-lettered at stage {{ $labels.stage }} in 10m"
+      - alert: ProducerIngestLatencyHigh
+        expr: >
+          histogram_quantile(0.95, sum by (le, exchange) (rate(flux_producer_event_lag_seconds_bucket[5m]))) > 2
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "p95 {{ $labels.exchange }} trade-to-Kafka latency is {{ $value | humanizeDuration }}"
+
+  - name: flink
+    rules:
+      - alert: FlinkJobsNotRunning
+        expr: max(flink_jobmanager_numRunningJobs) < 5 or absent(flink_jobmanager_numRunningJobs)
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "{{ $value }} of 5 Flink jobs running"
+      - alert: FlinkJobRestarting
+        expr: increase(flink_jobmanager_job_numRestarts[10m]) > 0
+        labels: { severity: warning }
+        annotations:
+          summary: "Flink job {{ $labels.job_name }} restarted {{ $value }} times in 10m"
+      - alert: FlinkCheckpointFailing
+        expr: increase(flink_jobmanager_job_numberOfFailedCheckpoints[10m]) > 1
+        labels: { severity: warning }
+        annotations:
+          summary: "Flink job {{ $labels.job_name }} failed {{ $value }} checkpoints in 10m"
+      - alert: FlinkBackpressured
+        expr: max by (job_name) (flink_taskmanager_job_task_backPressuredTimeMsPerSecond) > 500
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Flink job {{ $labels.job_name }} is back-pressured {{ $value }} ms/s"
+
+  - name: clickhouse
+    rules:
+      - alert: ClickHouseKafkaRowsRejected
+        expr: increase(ClickHouseProfileEvents_KafkaRowsRejected[10m]) > 0
+        labels: { severity: warning }
+        annotations:
+          summary: "ClickHouse rejected {{ $value }} Kafka rows in 10m (see flux.ingest_errors)"

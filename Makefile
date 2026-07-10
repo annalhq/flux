@@ -5,7 +5,7 @@ COMPOSE := docker compose
 UV      := uv run
 RECON_CLI := /opt/recon-venv/bin/python -m flux_recon.cli
 
-.PHONY: help env up down clean ps logs bootstrap jobs jobs-status jobs-down lake-stats recon producers producers-stop test lint fmt
+.PHONY: help env up down clean ps logs demo live bootstrap jobs jobs-status jobs-down lake-stats recon smoke producers producers-stop test lint fmt
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2}'
@@ -32,6 +32,23 @@ ps: ## Show service status
 logs: ## Follow logs (S=<service> to filter)
 	$(COMPOSE) --profile producers logs -f --tail=100 $(S)
 
+# Producers start before the jobs: a job that starts on empty topics marks every partition idle,
+# and the first partitions to receive data then drive the watermark alone. During the 120x
+# synthetic backfill that drops the first seconds of a slower partition as late.
+demo: .env ## Fresh start with the synthetic market (2 h backfill, then real time)
+	$(MAKE) clean
+	$(COMPOSE) up -d --wait
+	$(MAKE) bootstrap
+	PRODUCER_MODE=synthetic $(MAKE) producers
+	$(MAKE) jobs
+
+live: .env ## Fresh start with live Binance and Coinbase trades
+	$(MAKE) clean
+	$(COMPOSE) up -d --wait
+	$(MAKE) bootstrap
+	PRODUCER_MODE=live $(MAKE) producers
+	$(MAKE) jobs
+
 bootstrap: .env ## Create topics, register schemas, apply ClickHouse DDL (idempotent)
 	$(UV) python scripts/bootstrap.py
 
@@ -53,6 +70,9 @@ recon: ## Reconcile one closed hour (HOUR=YYYY-MM-DDTHH, UTC); writes recon tabl
 		start=$(HOUR):00:00+00:00; end=$$(date -u -d "$(HOUR):00:00Z + 1 hour" +%Y-%m-%dT%H:00:00+00:00); \
 		$(RECON_CLI) freshness $$start $$end; \
 		$(RECON_CLI) reconcile $$start $$end --run-id manual__$(HOUR)'
+
+smoke: .env ## End-to-end assertions against the running platform (6 min budget)
+	$(UV) python scripts/smoke.py
 
 producers: .env ## Build and start producers (PRODUCER_MODE=synthetic|live)
 	$(COMPOSE) --profile producers up -d --build --wait producers

@@ -362,8 +362,15 @@ services:
     image: flux/producers:0.1.0
     ports: ["8000:8000"]
     env_file: [{ path: .env, required: false }]
+    # Shell values override .env, e.g. `SYNTH_LATE_RATIO=0 make demo`.
     environment:
       PRODUCER_MODE: ${PRODUCER_MODE:-synthetic}
+      SYNTH_SEED: ${SYNTH_SEED}
+      SYNTH_BACKFILL_MINUTES: ${SYNTH_BACKFILL_MINUTES}
+      SYNTH_SPEED: ${SYNTH_SPEED}
+      SYNTH_TPS: ${SYNTH_TPS}
+      SYNTH_LATE_RATIO: ${SYNTH_LATE_RATIO}
+      SYNTH_DUP_RATIO: ${SYNTH_DUP_RATIO}
     depends_on:
       schema-registry: { condition: service_healthy }
     healthcheck:
