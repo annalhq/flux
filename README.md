@@ -1,5 +1,11 @@
 # Crypto Streaming Platform
 
+> Real-time analytics for cryptocurrency trades — live ingestion from Binance and
+> Coinbase, stateful stream processing with Apache Flink, ClickHouse OLAP, an
+> Iceberg lakehouse, hourly batch reconciliation, and Grafana dashboards. The whole
+> stack runs on Docker Compose.
+
+
 A real-time analytics platform for cryptocurrency trades. It reads live trades from
 Binance and Coinbase, processes them with Apache Flink, stores results in ClickHouse
 for fast queries, and shows them on Grafana dashboards. Raw trades are also archived
@@ -9,39 +15,28 @@ correct.
 This is a portfolio project built to practice real data engineering: streaming,
 stateful processing, a lakehouse, batch vs streaming reconciliation, and monitoring.
 
-## Articles
+## Table of Contents
 
-- [Architecture overview](https://medium.com/@dabahian.a1/494eb283fe27) — what the platform is and why each piece is there.
-- [Four production bugs (deep-dive)](https://medium.com/@dabahian.a1/3670f41f2139) — the real problems I debugged and fixed.
+- [Articles](#articles)
+- [Overview](#overview)
+- [Screenshots](#screenshots)
+- [Tech Stack](#tech-stack)
+- [Getting Started](#getting-started)
+  - [Requirements](#requirements)
+  - [Tested Environment](#tested-environment)
+  - [Quick Start](#quick-start)
+- [Web Interfaces](#web-interfaces)
+- [Useful Commands](#useful-commands)
+- [Kafka Topics](#kafka-topics)
+- [ClickHouse Tables](#clickhouse-tables)
+- [Testing](#testing)
+- [Known Limitations](#known-limitations)
+- [External Data Contracts](#external-data-contracts)
+- [Iceberg Table Maintenance (Not Implemented)](#iceberg-table-maintenance-not-implemented)
+- [What I Learned](#what-i-learned)
+- [Project Layout](#project-layout)
 
-## Dependency on external data contracts
-
-This project depends on the message format of the Binance and Coinbase
-WebSocket APIs. The producers parse specific fields (price, quantity,
-timestamp, symbol) from a fixed message structure, and the Avro schemas
-in the Schema Registry describe that structure.
-
-If either exchange changes its data contract — renames a field, changes a
-type, or restructures the message — the producers will fail to parse new
-messages and the pipeline will stop receiving valid data. This is an
-inherent risk of consuming third-party APIs: the upstream format is owned
-by the exchange, not by this project.
-
-In production this would be handled by:
-
-- **Schema validation at ingestion** — reject and route malformed messages
-  to the dead-letter queue (`dlq-events`) instead of failing the producer,
-  so one bad message does not stop the stream.
-- **Schema Registry compatibility checks** — use Avro schema evolution rules
-  (backward/forward compatibility) so consumers keep working when the schema
-  changes in a compatible way.
-- **Monitoring on parse errors** — alert when the rate of failed parses or
-  DLQ messages rises, so a contract change is detected quickly.
-
-For this portfolio project the producers assume the current (June 2026)
-message formats and do not yet implement full schema evolution handling.
-
-## What it does
+## Overview
 
 - **Ingest**: two Python producers connect to Binance and Coinbase over WebSocket and
   send trades to Kafka. Messages are serialized with Avro through a Schema Registry.
@@ -131,32 +126,38 @@ Example message:
 
 ![Prometheus targets](docs/prometheus.png)
 
-## Tech stack
+## Tech Stack
 
-Kafka (KRaft, 3 brokers) · Schema Registry (Avro) · Apache Flink (PyFlink) ·
-ClickHouse · MinIO · Apache Iceberg · Nessie · Apache Airflow · Prometheus ·
-Grafana · Docker Compose.
+**Exchange feeds**
 
-## Iceberg table maintenance (not implemented)
+[![Binance](https://img.shields.io/badge/Binance-%23FCD535.svg?style=for-the-badge&logo=binance&logoColor=black)](https://www.binance.com/en)
+[![Coinbase](https://img.shields.io/badge/Coinbase-%230052FF.svg?style=for-the-badge&logo=coinbase&logoColor=white)](https://www.coinbase.com)
 
-Iceberg tables need periodic maintenance over time:
+**Streaming core**
 
-- **Compaction** — merge many small files into fewer large ones for faster reads.
-- **Snapshot cleanup** — drop old snapshots from the table history.
-- **Orphan file removal** — delete files left in storage that no snapshot references,
-  e.g. after a failed write between a Flink checkpoint and the snapshot commit.
+[![Python](https://img.shields.io/badge/python-%233670A0.svg?style=for-the-badge&logo=python&logoColor=ffdd54)](https://www.python.org/)
+[![Apache Kafka](https://img.shields.io/badge/apachekafka-%23231F20.svg?style=for-the-badge&logo=apachekafka&logoColor=white)](https://kafka.apache.org/)
+[![Apache Flink](https://img.shields.io/badge/Apache%20Flink-%23E6526F.svg?style=for-the-badge&logo=Apache%20Flink&logoColor=white)](https://flink.apache.org/)
+[![Apache Avro](https://img.shields.io/badge/Apache%20Avro-%2330638E.svg?style=for-the-badge&logo=apacheavro&logoColor=white)](https://avro.apache.org/)
 
-In this project the maintenance task is a placeholder. PyIceberg could
-not run these procedures against the tables written by Flink's Nessie
-catalog, due to a metadata format mismatch between the two.
+**Storage & data lake**
 
-The production solution is a scheduled Spark job (e.g. on AWS Glue or
-Databricks) running `rewrite_data_files`, `expire_snapshots`, and
-`remove_orphan_files`. This is left as a known gap rather than
-implemented, since it would require adding Spark to a single-machine
-setup.
+[![ClickHouse](https://img.shields.io/badge/ClickHouse-%23FFCC01.svg?style=for-the-badge&logo=clickhouse&logoColor=black)](https://clickhouse.com/)
+[![MinIO](https://img.shields.io/badge/MinIO-%23C72E49.svg?style=for-the-badge&logo=minio&logoColor=white)](https://min.io/)
 
-## Requirements
+**Batch & observability**
+
+[![Apache Airflow](https://img.shields.io/badge/Apache%20Airflow-%23017CEE.svg?style=for-the-badge&logo=Apache%20Airflow&logoColor=white)](https://airflow.apache.org/)
+[![Prometheus](https://img.shields.io/badge/Prometheus-%23E6522C.svg?style=for-the-badge&logo=Prometheus&logoColor=white)](https://prometheus.io/)
+[![Grafana](https://img.shields.io/badge/grafana-%23F46800.svg?style=for-the-badge&logo=grafana&logoColor=white)](https://grafana.com/)
+[![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
+
+Kafka runs in KRaft mode (3 brokers) with a Confluent Schema Registry for Avro.
+Iceberg tables live in MinIO behind a Nessie catalog.
+
+## Getting Started
+
+### Requirements
 
 - **Docker Desktop** with at least **16 GB of memory** assigned
   (Settings → Resources → Memory). The stack is heavy: two Flink TaskManagers
@@ -165,7 +166,7 @@ setup.
 - About **2 GB of free disk** for the Docker images. The first start downloads them,
   which can take a while.
 
-## Tested environment
+### Tested Environment
 
 I developed and tested this project on a MacBook Pro (M1 Pro, 32 GB RAM).
 
@@ -173,12 +174,12 @@ I have not tested it on Windows, so I can't give reliable advice there. You may 
 into issues, especially with the `Makefile` and the host-side commands, which assume
 a Unix-like shell.
 
-## Quick start
+### Quick Start
 
 ```bash
 # 1. clone and enter the project
-git clone https://github.com/data-engineering-efforts/crypto-streaming-platform.git
-cd crypto-streaming-platform
+git clone https://github.com/annalhq/flux.git
+cd flux
 
 # 2. create a Python environment for the host scripts
 python -m venv venv
@@ -202,7 +203,7 @@ pulls all the other images. Later starts are much faster.
 > **Note:** the producers are started separately on purpose. They are long-running
 > processes that keep streaming trades, so they would block `make up` from finishing.
 
-## Web interfaces
+## Web Interfaces
 
 | Service        | URL                     | Notes                                  |
 |----------------|-------------------------|----------------------------------------|
@@ -215,7 +216,7 @@ pulls all the other images. Later starts are much faster.
 | Nessie         | http://localhost:19120  | Iceberg catalog                        |
 | ClickHouse     | http://localhost:8123   | SQL Play UI                            |
 
-## Useful commands
+## Useful Commands
 
 ```bash
 make help   # list all commands
@@ -226,7 +227,7 @@ make down   # stop services, keep the data
 make clean  # stop services and delete volumes (wipes all data)
 ```
 
-## Kafka topics
+## Kafka Topics
 
 | Topic                | Partitions | Purpose                          |
 |----------------------|-----------|-----------------------------------|
@@ -237,7 +238,7 @@ make clean  # stop services and delete volumes (wipes all data)
 Auto-creation of topics is turned off on purpose, so `make up` creates them with the
 right partition count and config.
 
-## ClickHouse tables
+## ClickHouse Tables
 
 All result tables use `ReplacingMergeTree(version)` for deduplication:
 `vwap_aggregations`, `whale_alerts`, `arbitrage_signals`, `double_bottom_signals`,
@@ -256,7 +257,7 @@ The tests cover the producer parsing logic, the Flink record transforms, and the
 schema round trip. Tests that need PyFlink or `confluent_kafka` are skipped if those
 libraries are not installed, so the Avro tests run in any environment.
 
-## Known limitations
+## Known Limitations
 
 These are intentional trade-offs for a local portfolio project:
 
@@ -275,7 +276,53 @@ These are intentional trade-offs for a local portfolio project:
 - **Some images use `latest` tags.** Pinning exact versions would improve
   reproducibility.
 
-## What I learned
+## External Data Contracts
+
+This project depends on the message format of the Binance and Coinbase
+WebSocket APIs. The producers parse specific fields (price, quantity,
+timestamp, symbol) from a fixed message structure, and the Avro schemas
+in the Schema Registry describe that structure.
+
+If either exchange changes its data contract — renames a field, changes a
+type, or restructures the message — the producers will fail to parse new
+messages and the pipeline will stop receiving valid data. This is an
+inherent risk of consuming third-party APIs: the upstream format is owned
+by the exchange, not by this project.
+
+In production this would be handled by:
+
+- **Schema validation at ingestion** — reject and route malformed messages
+  to the dead-letter queue (`dlq-events`) instead of failing the producer,
+  so one bad message does not stop the stream.
+- **Schema Registry compatibility checks** — use Avro schema evolution rules
+  (backward/forward compatibility) so consumers keep working when the schema
+  changes in a compatible way.
+- **Monitoring on parse errors** — alert when the rate of failed parses or
+  DLQ messages rises, so a contract change is detected quickly.
+
+For this portfolio project the producers assume the current (June 2026)
+message formats and do not yet implement full schema evolution handling.
+
+## Iceberg Table Maintenance (Not Implemented)
+
+Iceberg tables need periodic maintenance over time:
+
+- **Compaction** — merge many small files into fewer large ones for faster reads.
+- **Snapshot cleanup** — drop old snapshots from the table history.
+- **Orphan file removal** — delete files left in storage that no snapshot references,
+  e.g. after a failed write between a Flink checkpoint and the snapshot commit.
+
+In this project the maintenance task is a placeholder. PyIceberg could
+not run these procedures against the tables written by Flink's Nessie
+catalog, due to a metadata format mismatch between the two.
+
+The production solution is a scheduled Spark job (e.g. on AWS Glue or
+Databricks) running `rewrite_data_files`, `expire_snapshots`, and
+`remove_orphan_files`. This is left as a known gap rather than
+implemented, since it would require adding Spark to a single-machine
+setup.
+
+## What I Learned
 
 Real bugs I hit while building this, and how I fixed them. Each one is a short story
 about a non-obvious failure mode.
@@ -316,7 +363,7 @@ about a non-obvious failure mode.
   sustained lag fires, and disable the `consumergroup_members == 0` alert because Flink
   manages its own offsets and does not register as an active group member.
 
-## Project layout
+## Project Layout
 
 ```
 producers/        # Binance + Coinbase WebSocket producers (Avro)
