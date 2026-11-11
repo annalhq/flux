@@ -37,6 +37,7 @@ lakehouse, and an hourly Airflow job proves that the streaming results equal a b
 - [Delivery guarantees](#delivery-guarantees)
 - [Reconciliation: streaming equals batch](#reconciliation-streaming-equals-batch)
 - [Observability](#observability)
+- [Screenshots](#screenshots)
 - [Testing](#testing)
 - [Repository layout](#repository-layout)
 - [Known limitations](#known-limitations)
@@ -124,8 +125,7 @@ replays at 120x until it reaches the present, so every panel has data within a c
 | Nessie | http://localhost:19120 |
 | Producer metrics | http://localhost:8000/metrics |
 
-<details>
-<summary>More commands</summary>
+Other commands:
 
 | Command | Purpose |
 | --- | --- |
@@ -137,8 +137,6 @@ replays at 120x until it reaches the present, so every panel has data within a c
 | `make test lint` | Unit and contract tests, lint and format check |
 | `make down` / `make clean` | Stop services, keeping or deleting volumes |
 | `make help` | List every target |
-
-</details>
 
 Operations are described in [docs/runbook.md](docs/runbook.md); design decisions and everything
 verified along the way are in [docs/decisions.md](docs/decisions.md).
@@ -213,16 +211,27 @@ cover silent producers, DLQ traffic and ingest latency, consumer lag and under-r
 Flink job restarts, checkpoint failures and backpressure, and rows rejected by ClickHouse. Two provisioned Grafana dashboards show market data (**Flux / Market**) and platform
 health (**Flux / Platform**).
 
-<details>
-<summary>Screenshots</summary>
+## Screenshots
 
-| | |
-| --- | --- |
-| **Platform**: producers, Kafka, Flink and ClickHouse health ![Platform dashboard](docs/img/platform.png) | **Flink**: the five SQL jobs ![Flink jobs](docs/img/flink.png) |
-| **Airflow**: hourly reconciliation runs ![Airflow](docs/img/airflow.png) | **Kafka UI**: Avro trades decoded through Schema Registry ![Kafka UI](docs/img/kafka-ui.png) |
-| **MinIO**: Iceberg data files partitioned by `event_date` and `exchange` ![MinIO](docs/img/minio.png) | |
+**Platform dashboard:** producers, Kafka, Flink and ClickHouse health
 
-</details>
+![Platform dashboard](docs/img/platform.png)
+
+**Flink:** the five SQL jobs
+
+![Flink jobs](docs/img/flink.png)
+
+**Airflow:** hourly reconciliation runs
+
+![Airflow](docs/img/airflow.png)
+
+**Kafka UI:** Avro trades decoded through Schema Registry
+
+![Kafka UI](docs/img/kafka-ui.png)
+
+**MinIO:** Iceberg data files partitioned by `event_date` and `exchange`
+
+![MinIO](docs/img/minio.png)
 
 ## Testing
 
