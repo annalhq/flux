@@ -1,7 +1,8 @@
 FROM apache/airflow:2.9.3-python3.11
 
 # Reconciliation runs in its own virtualenv: Airflow's constraints pin pyiceberg 0.6, which
-# lacks the REST catalog features used here. DAG tasks call it via @task.external_python.
+# lacks the REST catalog features used here. DAG tasks run its CLI (python -m flux_recon.cli)
+# as a subprocess, so Airflow's interpreter never imports these packages.
 USER root
 RUN python -m venv /opt/recon-venv && chown -R airflow:root /opt/recon-venv
 USER airflow

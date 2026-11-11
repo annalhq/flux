@@ -23,8 +23,9 @@ from flux_producers.parsing import binance_asset, coinbase_asset
 log = logging.getLogger(__name__)
 
 DLQ_TOPIC = "dlq.producers"
-# Pinned so each asset owns one partition of the 3-partition raw topics; murmur2 would
-# put two of the three default keys on the same partition. Other assets fall back to hashing.
+# Pinned so each asset owns one partition of the 3-partition raw topics; the client's default
+# partitioner (CRC32 of the key) would put all three default keys on partition 2. Other assets
+# fall back to hashing.
 ASSET_PARTITIONS = {"BTC": 0, "ETH": 1, "SOL": 2}
 BUFFER_RETRIES = 3
 
