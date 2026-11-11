@@ -1146,7 +1146,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(ClickHouseProfileEvents_InsertedRows[1m])",
+          "expr": "deriv(ClickHouseProfileEvents_InsertedRows[2m])",
           "legendFormat": "inserted",
           "refId": "A"
         }
@@ -1192,7 +1192,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(ClickHouseProfileEvents_KafkaRowsRead[1m])",
+          "expr": "deriv(ClickHouseProfileEvents_KafkaRowsRead[2m])",
           "legendFormat": "read",
           "refId": "A"
         },
@@ -1201,7 +1201,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(ClickHouseProfileEvents_KafkaRowsRejected[1m])",
+          "expr": "deriv(ClickHouseProfileEvents_KafkaRowsRejected[2m])",
           "legendFormat": "rejected",
           "refId": "B"
         }

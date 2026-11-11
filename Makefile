@@ -32,22 +32,17 @@ ps: ## Show service status
 logs: ## Follow logs (S=<service> to filter)
 	$(COMPOSE) --profile producers logs -f --tail=100 $(S)
 
-# Producers start before the jobs: a job that starts on empty topics marks every partition idle,
-# and the first partitions to receive data then drive the watermark alone. During the 120x
-# synthetic backfill that drops the first seconds of a slower partition as late.
+# Jobs start before the producers: a windowed job started on a backlog can drop the data of the
+# partitions assigned to it last (see docs/decisions.md, "Starting on a backlog").
 demo: .env ## Fresh start with the synthetic market (2 h backfill, then real time)
 	$(MAKE) clean
-	$(COMPOSE) up -d --wait
-	$(MAKE) bootstrap
+	$(MAKE) up
 	PRODUCER_MODE=synthetic $(MAKE) producers
-	$(MAKE) jobs
 
 live: .env ## Fresh start with live Binance and Coinbase trades
 	$(MAKE) clean
-	$(COMPOSE) up -d --wait
-	$(MAKE) bootstrap
+	$(MAKE) up
 	PRODUCER_MODE=live $(MAKE) producers
-	$(MAKE) jobs
 
 bootstrap: .env ## Create topics, register schemas, apply ClickHouse DDL (idempotent)
 	$(UV) python scripts/bootstrap.py

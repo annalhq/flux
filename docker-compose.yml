@@ -365,12 +365,13 @@ services:
     # Shell values override .env, e.g. `SYNTH_LATE_RATIO=0 make demo`.
     environment:
       PRODUCER_MODE: ${PRODUCER_MODE:-synthetic}
-      SYNTH_SEED: ${SYNTH_SEED}
-      SYNTH_BACKFILL_MINUTES: ${SYNTH_BACKFILL_MINUTES}
-      SYNTH_SPEED: ${SYNTH_SPEED}
-      SYNTH_TPS: ${SYNTH_TPS}
-      SYNTH_LATE_RATIO: ${SYNTH_LATE_RATIO}
-      SYNTH_DUP_RATIO: ${SYNTH_DUP_RATIO}
+      SYNTH_SEED: ${SYNTH_SEED:-42}
+      SYNTH_BACKFILL_MINUTES: ${SYNTH_BACKFILL_MINUTES:-120}
+      SYNTH_SPEED: ${SYNTH_SPEED:-120}
+      SYNTH_WARMUP_SECONDS: ${SYNTH_WARMUP_SECONDS:-15}
+      SYNTH_TPS: ${SYNTH_TPS:-5}
+      SYNTH_LATE_RATIO: ${SYNTH_LATE_RATIO:-0.001}
+      SYNTH_DUP_RATIO: ${SYNTH_DUP_RATIO:-0.0005}
     depends_on:
       schema-registry: { condition: service_healthy }
     healthcheck:

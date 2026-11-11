@@ -15,6 +15,7 @@ class SynthSettings:
     seed: int = 42
     backfill_minutes: int = 120
     speed: float = 120.0
+    warmup_seconds: float = 15.0
     tps: float = 5.0
     late_ratio: float = 0.001
     dup_ratio: float = 0.0005
@@ -54,6 +55,7 @@ class Settings:
                 seed=int(env.get("SYNTH_SEED", "42")),
                 backfill_minutes=int(env.get("SYNTH_BACKFILL_MINUTES", "120")),
                 speed=float(env.get("SYNTH_SPEED", "120")),
+                warmup_seconds=float(env.get("SYNTH_WARMUP_SECONDS", "15")),
                 tps=float(env.get("SYNTH_TPS", "5")),
                 late_ratio=float(env.get("SYNTH_LATE_RATIO", "0.001")),
                 dup_ratio=float(env.get("SYNTH_DUP_RATIO", "0.0005")),

@@ -182,3 +182,19 @@ def test_trade_ids_do_not_collide_across_runs():
     first = SyntheticMarket(SynthSettings(), ASSETS, START)
     second = SyntheticMarket(SynthSettings(), ASSETS, START + 60_000)
     assert not trade_ids(first) & trade_ids(second)
+
+
+def test_event_clock_warms_up_in_real_time_then_accelerates():
+    from flux_producers.synthetic import event_clock_ms
+
+    start, now = 1_000_000_000_000, 2_000_000_000_000
+    assert event_clock_ms(start, 10, speed=120, warmup_s=15, now_ms=now) == start + 10_000
+    assert event_clock_ms(start, 15, speed=120, warmup_s=15, now_ms=now) == start + 15_000
+    assert event_clock_ms(start, 16, speed=120, warmup_s=15, now_ms=now) == start + 15_000 + 120_000
+
+
+def test_event_clock_never_passes_the_wall_clock():
+    from flux_producers.synthetic import event_clock_ms
+
+    start = 1_000_000_000_000
+    assert event_clock_ms(start, 10_000, speed=120, warmup_s=15, now_ms=start + 60_000) == start + 60_000

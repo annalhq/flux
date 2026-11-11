@@ -183,6 +183,20 @@ class SyntheticMarket:
         return messages
 
 
+def event_clock_ms(
+    start_ms: int, wall_elapsed_s: float, speed: float, warmup_s: float, now_ms: float
+) -> float:
+    """Event time reached after `wall_elapsed_s` seconds of wall clock.
+
+    The first `warmup_s` seconds run at real time so every partition receives data before the clock
+    accelerates: a delivery skew of a fraction of a second between partitions would otherwise become
+    tens of simulated seconds and land behind the watermark. Never runs ahead of the wall clock.
+    """
+    accelerated = max(0.0, wall_elapsed_s - warmup_s)
+    simulated_s = min(wall_elapsed_s, warmup_s) + accelerated * speed
+    return min(start_ms + simulated_s * 1000, now_ms)
+
+
 async def run(
     settings: SynthSettings,
     assets: tuple[str, ...],
@@ -197,9 +211,8 @@ async def run(
     market = SyntheticMarket(settings, assets, start_ms)
     while True:
         now = clock()
-        target_ms = min(
-            market.start_ms + (now - wall_start) * settings.speed * 1000,
-            now * 1000,
+        target_ms = event_clock_ms(
+            market.start_ms, now - wall_start, settings.speed, settings.warmup_seconds, now * 1000
         )
         generated = 0
         while market.next_second_start_ms + 1000 <= target_ms:

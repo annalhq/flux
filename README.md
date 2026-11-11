@@ -146,6 +146,9 @@ CI runs lint, format check, unit and contract tests, `docker compose config`, an
 
 - `FIRST_VALUE` / `LAST_VALUE` follow arrival order, so a late trade that still makes its window can set
   that window's open or close (and the last price used for spreads). Additive measures are unaffected.
+- A windowed job started fresh on a large backlog can drop data from the partitions its readers receive
+  last (the watermark races ahead on the others). Jobs therefore start before producers and restore from
+  checkpoints or savepoints; see the runbook.
 - The JobManager has no high availability. A host restart stops the jobs; `make jobs` restores them from
   their last checkpoints.
 - Spreads compare Binance USDT prices with Coinbase USD prices, so they include the USDT/USD basis.
