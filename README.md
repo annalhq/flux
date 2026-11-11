@@ -1,44 +1,53 @@
 # Flux
 
-Real-time crypto market analytics on a local, production-shaped data platform. Trades from Binance
-and Coinbase (or a seeded synthetic market) flow as Avro through Kafka into Flink SQL jobs that build
-1-minute OHLCV bars, cross-exchange spreads, whale alerts and double-bottom patterns. Results are
-served from ClickHouse to Grafana, every trade lands in an Iceberg lakehouse, and an hourly Airflow
-job proves that the streaming results equal the batch recomputation **exactly**, window by window,
-or explains precisely where they differ.
+**Real-time crypto market analytics on a local, production-shaped streaming data platform.**
+
+[![CI](https://github.com/annalhq/flux/actions/workflows/ci.yml/badge.svg)](https://github.com/annalhq/flux/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/python-3.11-3776AB?logo=python&logoColor=white)
+![Kafka](https://img.shields.io/badge/Kafka-3.7-231F20?logo=apachekafka&logoColor=white)
+![Flink](https://img.shields.io/badge/Flink-1.19-E6526F?logo=apacheflink&logoColor=white)
+![Iceberg](https://img.shields.io/badge/Iceberg-Nessie-4E8EE9)
+![ClickHouse](https://img.shields.io/badge/ClickHouse-24.3-FFCC01?logo=clickhouse&logoColor=black)
+![Airflow](https://img.shields.io/badge/Airflow-2.9-017CEE?logo=apacheairflow&logoColor=white)
+
+Trades from Binance and Coinbase (or a seeded synthetic market) flow as Avro through Kafka into Flink
+SQL jobs that build 1-minute OHLCV bars, cross-exchange spreads, whale alerts and double-bottom
+patterns. Results are served from ClickHouse to Grafana, every raw trade lands in an Iceberg
+lakehouse, and an hourly Airflow job proves that the streaming results equal a batch recomputation
+**exactly**, window by window, or explains precisely where they differ.
 
 ![Market dashboard](docs/img/market.png)
 
-## Quickstart
+## Highlights
 
-Requirements: Docker with Compose v2, [uv](https://docs.astral.sh/uv/), about 4 GB of free memory.
+- **Exactly-once, end to end:** idempotent producers → checkpointed Flink → transactional Kafka sinks → `read_committed` ClickHouse with idempotent `ReplacingMergeTree` keys.
+- **Event-time stream processing in SQL:** watermarks with idle-source handling, window TVFs, a window join, and CEP with `MATCH_RECOGNIZE`.
+- **Lambda-style verification without the lambda:** the lake is the source of truth, and a batch job reconciles it against the streaming output with zero tolerance.
+- **Lakehouse:** Iceberg on MinIO with a versioned Nessie catalog, written by Flink and read by PyIceberg + DuckDB.
+- **Data contracts:** Avro schemas in Schema Registry with BACKWARD compatibility enforced in tests, plus a dead-letter queue.
+- **Operable:** one-command bring-up, health-gated startup, savepoint/checkpoint restore, Prometheus alerts, an end-to-end smoke test and CI.
 
-```bash
-make demo        # fresh start: all services, topics, schemas, 5 Flink jobs, synthetic producers
-make smoke       # end-to-end assertions (about 3-6 minutes after `make demo`)
-```
+## Contents
 
-Then open Grafana at http://localhost:3000 (dashboards **Flux / Market** and **Flux / Platform**;
-anonymous viewing is on, admin password `admin`). The synthetic market starts two hours in the past and
-replays at 120x until it reaches the present, so every panel has data within a couple of minutes.
-
-| UI | URL |
-| --- | --- |
-| Grafana | http://localhost:3000 |
-| Flink | http://localhost:8080 |
-| Kafka UI | http://localhost:8090 |
-| Airflow (`admin` / `admin`) | http://localhost:8082 |
-| Prometheus | http://localhost:9090 |
-| MinIO console (`minioadmin` / `minioadmin`) | http://localhost:9001 |
-| Nessie | http://localhost:19120 |
-| Producer metrics | http://localhost:8000/metrics |
-
-Other entry points: `make live` (live exchange data), `make recon HOUR=2026-11-11T13`,
-`make lake-stats`, `make jobs-status`, `make jobs-down && make jobs` (savepoint round trip),
-`make test lint`. Operations are described in [docs/runbook.md](docs/runbook.md); design decisions and
-everything verified along the way are in [docs/decisions.md](docs/decisions.md).
+- [Architecture](#architecture)
+- [Tech stack](#tech-stack)
+- [Quickstart](#quickstart)
+- [Streaming jobs](#streaming-jobs)
+- [Data model](#data-model)
+- [Delivery guarantees](#delivery-guarantees)
+- [Reconciliation: streaming equals batch](#reconciliation-streaming-equals-batch)
+- [Observability](#observability)
+- [Testing](#testing)
+- [Repository layout](#repository-layout)
+- [Known limitations](#known-limitations)
+- [Roadmap](#roadmap)
 
 ## Architecture
+
+![Flux architecture](docs/img/arch.svg)
+
+<details>
+<summary>Text version (Mermaid)</summary>
 
 ```mermaid
 flowchart LR
@@ -68,6 +77,77 @@ flowchart LR
   P & Flink & Kafka & CH -. metrics .-> PR --> GF
 ```
 
+</details>
+
+**Data flow**
+
+1. **Ingest:** Python producers normalize exchange WebSocket trades (or a deterministic synthetic market) into Avro, register schemas, and publish to `raw.*.trades`. Messages that fail validation or delivery go to `dlq.producers` with their payload.
+2. **Process:** Flink SQL jobs read both raw topics, compute aggregates and signals in event time, and write them to `agg.*` and `signals.*` topics transactionally.
+3. **Land:** a separate Flink job appends every raw trade to the Iceberg table `market.trades`, committing once per checkpoint.
+4. **Serve:** ClickHouse consumes the output topics through Kafka-engine tables and materialized views; Grafana queries ClickHouse.
+5. **Verify:** Airflow recomputes each closed hour from the lake and compares it with ClickHouse, failing the DAG on any unexplained difference.
+
+## Tech stack
+
+| Layer | Technology | Role |
+| --- | --- | --- |
+| Ingestion | Python 3.11, `confluent-kafka`, `websockets` | Exchange clients, synthetic market, Avro serialization, DLQ |
+| Messaging | Apache Kafka 3.7 (3 brokers, KRaft), Confluent Schema Registry 7.6 | Durable log, schema contracts |
+| Stream processing | Apache Flink 1.19 (SQL) | Windowed aggregates, joins, CEP, lake sink |
+| Lakehouse | Apache Iceberg, Nessie (Postgres-backed), MinIO | Raw trade history on object storage with a versioned catalog |
+| Serving | ClickHouse 24.3 | Low-latency analytical store for dashboards and reconciliation |
+| Orchestration | Apache Airflow 2.9, PyIceberg, DuckDB | Hourly batch recomputation and reconciliation |
+| Observability | Prometheus 2.51, Grafana 10.4, kafka-exporter | Metrics, alert rules, dashboards |
+| Tooling | Docker Compose, uv, ruff, pytest, GitHub Actions | Local platform, dependency management, CI |
+
+## Quickstart
+
+Requirements: Docker with Compose v2, [uv](https://docs.astral.sh/uv/), about 4 GB of free memory.
+
+```bash
+make demo        # fresh start: all services, topics, schemas, 5 Flink jobs, synthetic producers
+make smoke       # end-to-end assertions (about 3-6 minutes after `make demo`)
+```
+
+Then open Grafana at http://localhost:3000 (dashboards **Flux / Market** and **Flux / Platform**;
+anonymous viewing is on, admin password `admin`). The synthetic market starts two hours in the past and
+replays at 120x until it reaches the present, so every panel has data within a couple of minutes.
+
+| UI | URL |
+| --- | --- |
+| Grafana | http://localhost:3000 |
+| Flink | http://localhost:8080 |
+| Kafka UI | http://localhost:8090 |
+| Airflow (`admin` / `admin`) | http://localhost:8082 |
+| Prometheus | http://localhost:9090 |
+| MinIO console (`minioadmin` / `minioadmin`) | http://localhost:9001 |
+| Nessie | http://localhost:19120 |
+| Producer metrics | http://localhost:8000/metrics |
+
+<details>
+<summary>More commands</summary>
+
+| Command | Purpose |
+| --- | --- |
+| `make live` | Fresh start with live Binance and Coinbase trades |
+| `make recon HOUR=2026-11-11T13` | Reconcile one closed hour (UTC) outside Airflow |
+| `make lake-stats` | Iceberg row, partition and snapshot counts |
+| `make jobs-status` | Flink job state and checkpoint health |
+| `make jobs-down && make jobs` | Stop jobs with savepoints, then restore them |
+| `make test lint` | Unit and contract tests, lint and format check |
+| `make down` / `make clean` | Stop services, keeping or deleting volumes |
+| `make help` | List every target |
+
+</details>
+
+Operations are described in [docs/runbook.md](docs/runbook.md); design decisions and everything
+verified along the way are in [docs/decisions.md](docs/decisions.md).
+
+## Streaming jobs
+
+All jobs are plain Flink SQL rendered from one shared layer of settings, sources and views
+([flink/sql](flink/sql)).
+
 | Job | Technique | Output |
 | --- | --- | --- |
 | `bars_1m` | Event-time tumbling windows over a `UNION ALL` of both exchanges; watermarks with idle-source handling | 1-minute OHLCV with exact `volume`, `notional`, `trade_count` |
@@ -76,14 +156,16 @@ flowchart LR
 | `double_bottom` | `MATCH_RECOGNIZE` over 1-minute bars with tolerance and depth rules | Pattern start, lows, neckline, breakout |
 | `lake_sink` | Iceberg sink, commit per 60 s checkpoint, partitioned by `event_date, exchange` | `market.trades`, every raw trade |
 
-## What this demonstrates
+## Data model
 
-1. **Event-time stream processing:** watermarks, idle sources, window TVFs, a window join, and CEP with `MATCH_RECOGNIZE`, all as plain SQL rendered from one shared layer ([flink/sql](flink/sql)).
-2. **Delivery semantics, end to end:** idempotent producers → exactly-once Flink → transactional Kafka → `read_committed` ClickHouse with idempotent `ReplacingMergeTree` keys (table below).
-3. **Lakehouse:** Iceberg on object storage with a versioned catalog (Nessie, persisted in Postgres) read by Flink and PyIceberg through the same Iceberg REST endpoint.
-4. **Data quality as a control, not a dashboard:** schema contracts with BACKWARD compatibility, a dead-letter queue, and exact batch-versus-stream reconciliation that fails the pipeline when the numbers do not add up.
-5. **Operability:** one-command bring-up, health-gated startup, idempotent deploys, automatic restore from checkpoints and savepoints, Prometheus alerts, dashboards.
-6. **Engineering hygiene:** pinned versions everywhere, unit and contract tests that need no infrastructure, an end-to-end smoke test, CI.
+| Layer | Object | Notes |
+| --- | --- | --- |
+| Kafka (raw) | `raw.binance.trades`, `raw.coinbase.trades` | Avro, keyed for per-asset ordering; schemas in [producers/schemas](producers/schemas) |
+| Kafka (derived) | `agg.bars-1m`, `agg.spreads-5s`, `signals.whales`, `signals.double-bottom` | Transactional Flink output |
+| Kafka (errors) | `dlq.producers` | Rejected messages with payload and stage |
+| Lake | `market.trades` (Iceberg) | Every raw trade, partitioned by `event_date, exchange` |
+| Serving | `flux.bars_1m`, `flux.spreads_5s`, `flux.whale_trades`, `flux.double_bottoms` | `ReplacingMergeTree` on business keys, fed by Kafka engine + MVs |
+| Quality | `flux.ingest_errors`, `flux.recon_runs`, `flux.recon_windows` | Malformed rows and reconciliation results |
 
 ## Delivery guarantees
 
@@ -124,13 +206,23 @@ lost trades are listed individually. Corrupting one bar in ClickHouse makes the 
 
 ![Reconciliation](docs/img/reconciliation.png)
 
-## Screenshots
+## Observability
+
+Producers, Kafka (via kafka-exporter), Flink and ClickHouse expose Prometheus metrics. Alert rules
+cover silent producers, DLQ traffic and ingest latency, consumer lag and under-replicated partitions,
+Flink job restarts, checkpoint failures and backpressure, and rows rejected by ClickHouse. Two provisioned Grafana dashboards show market data (**Flux / Market**) and platform
+health (**Flux / Platform**).
+
+<details>
+<summary>Screenshots</summary>
 
 | | |
 | --- | --- |
 | **Platform**: producers, Kafka, Flink and ClickHouse health ![Platform dashboard](docs/img/platform.png) | **Flink**: the five SQL jobs ![Flink jobs](docs/img/flink.png) |
 | **Airflow**: hourly reconciliation runs ![Airflow](docs/img/airflow.png) | **Kafka UI**: Avro trades decoded through Schema Registry ![Kafka UI](docs/img/kafka-ui.png) |
 | **MinIO**: Iceberg data files partitioned by `event_date` and `exchange` ![MinIO](docs/img/minio.png) | |
+
+</details>
 
 ## Testing
 
@@ -141,6 +233,25 @@ lost trades are listed individually. Corrupting one bar in ClickHouse makes the 
 | `scripts/smoke.py` | Services healthy, 5 jobs running, bars for all pairs, signals present, no ingest errors, Iceberg rows, last closed hour reconciles, Flink lag | yes (`make smoke`) |
 
 CI runs lint, format check, unit and contract tests, `docker compose config`, and builds the three images.
+
+## Repository layout
+
+```
+flux/
+├── producers/          # Exchange clients, synthetic market, Avro schemas, DLQ (Python)
+├── flink/
+│   ├── submit.py       # Renders SQL, submits jobs, restores from checkpoints/savepoints
+│   └── sql/            # common/ (settings, sources, views), jobs/, lake/ (Iceberg catalog)
+├── airflow/
+│   ├── dags/           # reconcile_hourly
+│   └── flux_recon/     # Batch recomputation and comparison logic
+├── infra/              # ClickHouse DDL, Flink/Airflow images, Grafana, Prometheus, Postgres
+├── scripts/            # bootstrap (topics, schemas, DDL) and end-to-end smoke test
+├── tests/              # unit/ and contract/ suites
+├── docs/               # runbook, design decisions, images
+├── docker-compose.yml
+└── Makefile
+```
 
 ## Known limitations
 
@@ -158,7 +269,7 @@ CI runs lint, format check, unit and contract tests, `docker compose config`, an
   the DLQ and producer alerts cover them.
 - Sized for a laptop: on hosts with less than ~4 GB free, memory pressure can stall Kafka.
 
-## Next steps
+## Roadmap
 
 - A normalizer job writing a canonical `trades` topic, so downstream jobs and the lake read one stream.
 - An event-time arg-max aggregate for open, close and last price.
